@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="th">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>โปรไฟล์ผู้ใช้</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/vue@3.3.4/dist/vue.global.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <style>
+        body {
+            background-color: #f8f9fa;
+        }
+
+        .profile-section {
+            min-height: 100vh;
+            padding-top: 2rem;
+        }
+
+        .profile-card {
+            border: none;
+            border-radius: 15px;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
+        }
+
+        .profile-header {
+            background: #007bff;
+            color: white;
+            border-radius: 15px 15px 0 0;
+            padding: 20px;
+        }
+
+        .avatar {
+            width: 120px;
+            height: 120px;
+            border-radius: 60px;
+            background: #ffffff;
+            padding: 4px;
+            margin-bottom: 1rem;
+        }
+
+        .nav-buttons {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            z-index: 1000;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="app">
+        <!-- Navigation Buttons -->
+        <div class="nav-buttons">
+            <button @click="logout" class="btn btn-outline-danger">ออกจากระบบ</button>
+        </div>
+
+        <div class="container profile-section" v-if="userData">
+            <div class="row justify-content-center">
+                <div class="col-md-8">
+                    <div class="profile-card card">
+                        <div class="profile-header text-center">
+                            <div class="d-flex justify-content-center">
+                                <img src="https://via.placeholder.com/120" alt="Profile" class="avatar">
+                            </div>
+                            <h3>โปรไฟล์ของฉัน</h3>
+                        </div>
+                        <div class="card-body p-4">
+                            <!-- User Information -->
+                            <div class="row mb-4">
+                                <div class="col-md-6">
+                                    <h5 class="text-muted mb-3">ข้อมูลทั่วไป</h5>
+                                    <p><strong>ชื่อผู้ใช้:</strong> {{ userData.username }}</p>
+                                    <p><strong>อีเมล:</strong> {{ userData.email }}</p>
+                                </div>
+                                <!-- ด้วยโค้ดนี้ -->
+                                <div class="col-md-6">
+                                    <div class="d-flex justify-content-between align-items-center mb-3">
+                                        <h5 class="text-muted">ที่อยู่</h5>
+                                        <button v-if="!isEditing" @click="startEdit"
+                                            class="btn btn-sm btn-outline-primary">
+                                            แก้ไข
+                                        </button>
+                                    </div>
+
+                                    <!-- แสดงข้อมูลปกติ -->
+                                    <div v-if="!isEditing">
+                                        <p><strong>จังหวัด:</strong> {{ userData.province }}</p>
+                                        <p><strong>อำเภอ:</strong> {{ userData.district }}</p>
+                                        <p><strong>ตำบล:</strong> {{ userData.sub_district }}</p>
+                                    </div>
+
+                                    <!-- ฟอร์มแก้ไข -->
+                                    <div v-else>
+                                        <div class="mb-3">
+                                            <label class="form-label">จังหวัด</label>
+                                            <select class="form-select" v-model="editData.province"
+                                                @change="loadDistricts">
+                                                <option value="">เลือกจังหวัด</option>
+                                                <option v-for="province in provinces" :key="province" :value="province">
+                                                    {{ province }}
+                                                </option>
+                                            </select>
+                                        </div>
+
+                                        <div class="mb-3">
+                                            <label class="form-label">อำเภอ</label>
+                                            <select class="form-select" v-model="editData.district"
+                                                @change="loadSubDistricts" :disabled="!editData.province">
+                                                <option value="">เลือกอำเภอ</option>
+                                                <option v-for="district in districts" :key="district" :value="district">
+                                                    {{ district }}
+                                                </option>
+                                            </select>
+                                        </div>
+
+                                        <div class="mb-3">
+                                            <label class="form-label">ตำบล</label>
+                                            <select class="form-select" v-model="editData.sub_district"
+                                                :disabled="!editData.district">
+                                                <option value="">เลือกตำบล</option>
+                                                <option v-for="subDistrict in subDistricts" :key="subDistrict"
+                                                    :value="subDistrict">
+                                                    {{ subDistrict }}
+                                                </option>
+                                            </select>
+                                        </div>
+
+                                        <div class="d-flex gap-2">
+                                            <button @click="saveEdit" class="btn btn-success">บันทึก</button>
+                                            <button @click="cancelEdit" class="btn btn-secondary">ยกเลิก</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Additional Information -->
+                            <div class="row">
+                                <div class="col-12">
+                                    <h5 class="text-muted mb-3">ข้อมูลเพิ่มเติม</h5>
+                                    <p><strong>วันที่สมัคร:</strong> {{ formatDate(userData.createdAt) }}</p>
+                                    <p><strong>อัพเดทล่าสุด:</strong> {{ formatDate(userData.updatedAt) }}</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const { createApp, ref, onMounted } = Vue
+
+        createApp({
+            setup() {
+                // ตัวแปรพื้นฐาน
+                const userData = ref(null)
+                const isLoading = ref(true)
+
+                // ตัวแปรสำหรับการแก้ไขที่อยู่
+                const isEditing = ref(false)
+                const editData = ref({
+                    province: '',
+                    district: '',
+                    sub_district: ''
+                })
+                const provinces = ref([])
+                const districts = ref([])
+                const subDistricts = ref([])
+
+                // ฟังก์ชันช่วยจัดรูปแบบวันที่
+                const formatDate = (dateString) => {
+                    if (!dateString) return '-'
+                    return new Date(dateString).toLocaleString('th-TH', {
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                    })
+                }
+
+                // Fetch user profile
+                const fetchUserProfile = async () => {
+                    const token = localStorage.getItem('token')
+                    if (!token) {
+                        window.location.href = 'login.html'
+                        return
+                    }
+
+                    try {
+                        const response = await axios.get('https://express-test-api-l0zc.onrender.com/profile', {
+                            headers: {
+                                'Authorization': `Bearer ${token}`
+                            }
+                        })
+                        userData.value = response.data
+                        console.log('Profile data:', response.data)
+                    } catch (error) {
+                        console.error('Error fetching profile:', error)
+                        if (error.response && error.response.status === 401) {
+                            Swal.fire({
+                                title: 'เซสชันหมดอายุ',
+                                text: 'กรุณาเข้าสู่ระบบใหม่',
+                                icon: 'warning'
+                            }).then(() => {
+                                localStorage.removeItem('token')
+                                window.location.href = 'login.html'
+                            })
+                        } else {
+                            Swal.fire({
+                                title: 'เกิดข้อผิดพลาด',
+                                text: 'ไม่สามารถดึงข้อมูลโปรไฟล์ได้',
+                                icon: 'error'
+                            })
+                        }
+                    } finally {
+                        isLoading.value = false
+                    }
+                }
+
+                // Logout function
+                const logout = () => {
+                    Swal.fire({
+                        title: 'ยืนยันการออกจากระบบ',
+                        text: 'คุณต้องการออกจากระบบใช่หรือไม่?',
+                        icon: 'question',
+                        showCancelButton: true,
+                        confirmButtonText: 'ใช่',
+                        cancelButtonText: 'ไม่'
+                    }).then((result) => {
+                        if (result.isConfirmed) {
+                            localStorage.removeItem('token')
+                            window.location.href = 'login.html'
+                        }
+                    })
+                }
+
+                // เพิ่มฟังก์ชันทั้งหมด
+                const loadProvinces = async () => {
+                    try {
+                        const response = await axios.get('https://express-test-api-l0zc.onrender.com/provinces')
+                        provinces.value = response.data
+                    } catch (error) {
+                        console.error('Error loading provinces:', error)
+                    }
+                }
+
+                const loadDistricts = async () => {
+                    if (!editData.value.province) return
+                    try {
+                        const response = await axios.get(
+                            `https://express-test-api-l0zc.onrender.com/provinces/${encodeURIComponent(editData.value.province)}`
+                        )
+                        districts.value = response.data
+                        editData.value.district = ''
+                        editData.value.sub_district = ''
+                        subDistricts.value = []
+                    } catch (error) {
+                        console.error('Error loading districts:', error)
+                    }
+                }
+
+                const loadSubDistricts = async () => {
+                    if (!editData.value.district) return
+                    try {
+                        const response = await axios.get(
+                            `https://express-test-api-l0zc.onrender.com/provinces/${encodeURIComponent(editData.value.province)}/${encodeURIComponent(editData.value.district)}`
+                        )
+                        subDistricts.value = response.data
+                        editData.value.sub_district = ''
+                    } catch (error) {
+                        console.error('Error loading sub-districts:', error)
+                    }
+                }
+
+                const startEdit = () => {
+                    isEditing.value = true
+                    editData.value = {
+                        province: userData.value.province,
+                        district: userData.value.district,
+                        sub_district: userData.value.sub_district
+                    }
+                    loadProvinces()
+                }
+
+                const saveEdit = async () => {
+                    try {
+                        const token = localStorage.getItem('token')
+                        // แก้ไข URL endpoint
+                        const response = await axios.put(
+                            'https://express-test-api-l0zc.onrender.com/profile',  // แก้จาก profile/address เป็น profile/update-address
+                            {
+                                email: userData.value.email,
+                                province: editData.value.province,
+                                district: editData.value.district,
+                                sub_district: editData.value.sub_district
+                            },
+                            {
+                                headers: {
+                                    'Authorization': `Bearer ${token}`,
+                                    'Content-Type': 'application/json'
+                                }
+                            }
+                        )
+
+                        if (response.status === 200) {
+                            // อัพเดทข้อมูลในหน้าเว็บ
+                            userData.value = {
+                                ...userData.value,
+                                ...editData.value
+                            }
+                            isEditing.value = false
+                            Swal.fire({
+                                title: 'สำเร็จ!',
+                                text: 'แก้ไขข้อมูลที่อยู่เรียบร้อยแล้ว',
+                                icon: 'success'
+                            })
+                        }
+                    } catch (error) {
+                        console.error('Error updating address:', error)
+                        let errorMessage = 'ไม่สามารถแก้ไขข้อมูลได้'
+
+                        // เพิ่มการจัดการ error ที่เฉพาะเจาะจงมากขึ้น
+                        if (error.response) {
+                            if (error.response.status === 404) {
+                                errorMessage = 'ไม่พบ endpoint สำหรับการอัพเดทข้อมูล'
+                            } else if (error.response.status === 401) {
+                                errorMessage = 'กรุณาเข้าสู่ระบบใหม่'
+                            } else if (error.response.data && error.response.data.message) {
+                                errorMessage = error.response.data.message
+                            }
+                        }
+
+                        Swal.fire({
+                            title: 'เกิดข้อผิดพลาด',
+                            text: errorMessage,
+                            icon: 'error'
+                        })
+                    }
+                }
+
+                const cancelEdit = () => {
+                    isEditing.value = false
+                    editData.value = {
+                        province: userData.value.province,
+                        district: userData.value.district,
+                        sub_district: userData.value.sub_district
+                    }
+                }
+
+                // Check authentication on mount
+                onMounted(() => {
+                    fetchUserProfile()
+                })
+
+                return {
+                    userData,
+                    isLoading,
+                    formatDate,
+                    logout,
+                    isEditing,
+                    editData,
+                    provinces,
+                    districts,
+                    subDistricts,
+                    startEdit,
+                    saveEdit,
+                    cancelEdit,
+                    loadDistricts,
+                    loadSubDistricts
+                }
+            }
+        }).mount('#app')
+    </script>
+</body>
+
+</html>

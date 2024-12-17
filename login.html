@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="th">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>เข้าสู่ระบบ</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/vue@3.3.4/dist/vue.global.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <style>
+        body {
+            background-color: #f8f9fa;
+        }
+
+        .login-container {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+        }
+
+        .card {
+            border: none;
+            border-radius: 15px;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
+        }
+
+        .card-header {
+            background: #007bff;
+            color: white;
+            border-radius: 15px 15px 0 0 !important;
+            padding: 20px;
+        }
+
+        .btn-login {
+            padding: 12px;
+            font-weight: bold;
+        }
+
+        .form-control {
+            padding: 12px;
+            border-radius: 8px;
+        }
+
+        .form-control:focus {
+            box-shadow: 0 0 0 0.25rem rgba(0, 123, 255, .25);
+        }
+
+        .welcome-text {
+            color: #343a40;
+        }
+
+        .nav-buttons {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+        }
+
+        .nav-link {
+            text-decoration: none;
+            color: #007bff;
+            transition: all 0.3s;
+        }
+
+        .nav-link:hover {
+            color: #0056b3;
+            text-decoration: underline;
+        }
+
+        .btn-register {
+            margin-left: 10px;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="app">
+        <div class="nav-buttons">
+            <a href="login.html" class="btn btn-outline-primary">เข้าสู่ระบบ</a>
+            <a href="index.html" class="btn btn-outline-success btn-register">ลงทะเบียน</a>
+        </div>
+        <div class="container login-container">
+            <div class="row w-100 justify-content-center">
+                <div class="col-md-8 col-lg-6">
+                    <div class="text-center mb-4">
+                        <h2 class="welcome-text">ยินดีต้อนรับ</h2>
+                        <p class="text-muted">กรุณาเข้าสู่ระบบเพื่อดำเนินการต่อ</p>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-header text-center">
+                            <h4 class="mb-0">เข้าสู่ระบบ</h4>
+                        </div>
+                        <div class="card-body p-4">
+                            <form @submit.prevent="submitLogin">
+                                <!-- Username -->
+                                <div class="mb-3">
+                                    <label for="username" class="form-label">ชื่อผู้ใช้</label>
+                                    <input type="text" class="form-control" id="username"
+                                        v-model.trim="formData.username"
+                                        :class="{'is-invalid': !isUsernameValid && isSubmitted}" required
+                                        placeholder="กรอกชื่อผู้ใช้">
+                                    <div class="invalid-feedback">
+                                        กรุณากรอกชื่อผู้ใช้
+                                    </div>
+                                </div>
+
+                                <!-- Password -->
+                                <div class="mb-4">
+                                    <label for="password" class="form-label">รหัสผ่าน</label>
+                                    <input type="password" class="form-control" id="password"
+                                        v-model.trim="formData.password"
+                                        :class="{'is-invalid': !isPasswordValid && isSubmitted}" required
+                                        placeholder="กรอกรหัสผ่าน">
+                                    <div class="invalid-feedback">
+                                        กรุณากรอกรหัสผ่าน
+                                    </div>
+                                </div>
+
+                                <button type="submit" class="btn btn-primary w-100 btn-login" :disabled="isLoading">
+                                    {{ isLoading ? 'กำลังดำเนินการ...' : 'เข้าสู่ระบบ' }}
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const { createApp, ref, computed } = Vue
+
+        createApp({
+            setup() {
+                const formData = ref({
+                    username: '',
+                    password: ''
+                })
+
+                const isLoading = ref(false)
+                const isSubmitted = ref(false)
+
+                // เพิ่มการ log ข้อมูลเมื่อ component mounted
+                console.log('Login component mounted')
+                console.log('Checking for existing token...')
+                const existingToken = localStorage.getItem('token')
+                if (existingToken) {
+                    console.log('Found existing token:', existingToken)
+                } else {
+                    console.log('No existing token found')
+                }
+
+                // Validation computed properties
+                const isUsernameValid = computed(() => formData.value.username.length > 0)
+                const isPasswordValid = computed(() => formData.value.password.length > 0)
+
+                // Form submission
+                const submitLogin = async () => {
+                    console.log('Login attempt with username:', formData.value.username)
+                    isSubmitted.value = true
+
+                    if (!isUsernameValid.value || !isPasswordValid.value) {
+                        console.warn('Validation failed - missing required fields')
+                        Swal.fire({
+                            title: 'ข้อผิดพลาด',
+                            text: 'กรุณากรอกข้อมูลให้ครบถ้วน',
+                            icon: 'error'
+                        })
+                        return
+                    }
+
+                    console.log('All validations passed, attempting to login...')
+                    isLoading.value = true
+                    try {
+                        console.log('Sending login request...')
+                        const response = await axios.post(
+                            'https://express-test-api-l0zc.onrender.com/login',
+                            {
+                                username: formData.value.username,
+                                password: formData.value.password
+                            },
+                            {
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                    'Accept': 'application/json'
+                                }
+                            }
+                        )
+
+                        console.log('Login response:', response)
+
+                        if (response.status === 200) {
+                            console.log('Login successful, token received:', response.data.token)
+                            localStorage.setItem('token', response.data.token)
+                            Swal.fire({
+                                title: 'สำเร็จ!',
+                                text: 'เข้าสู่ระบบสำเร็จ',
+                                icon: 'success'
+                            }).then(() => {
+                                console.log('Redirecting to profile page...')
+                                window.location.href = 'profile.html'  // แก้ไขตรงนี้
+                            })
+                        }
+                    } catch (error) {
+                        console.error('Login error:', error)
+                        let errorMessage = 'เกิดข้อผิดพลาดในการเข้าสู่ระบบ'
+
+                        if (error.response) {
+                            console.log('Error response:', error.response)
+                            if (error.response.status === 401) {
+                                errorMessage = 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง'
+                            }
+                        }
+
+                        Swal.fire({
+                            title: 'ข้อผิดพลาด',
+                            text: errorMessage,
+                            icon: 'error'
+                        })
+                    } finally {
+                        console.log('Login attempt completed')
+                        isLoading.value = false
+                    }
+                }
+
+                return {
+                    formData,
+                    isLoading,
+                    isSubmitted,
+                    isUsernameValid,
+                    isPasswordValid,
+                    submitLogin
+                }
+            }
+        }).mount('#app')
+    </script>
+</body>
+
+</html>
